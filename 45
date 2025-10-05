@@ -1,0 +1,41 @@
+import React, { createContext, useContext, useState, useMemo } from 'react';
+
+interface LumaStatusContextType {
+  isListening: boolean;
+  setIsListening: (isListening: boolean) => void;
+  isSpeaking: boolean;
+  setIsSpeaking: (isSpeaking: boolean) => void;
+  speakingMessageId: string | null;
+  setSpeakingMessageId: (id: string | null) => void;
+}
+
+const LumaStatusContext = createContext<LumaStatusContextType | undefined>(undefined);
+
+export const LumaStatusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  const value = useMemo(() => ({
+    isListening,
+    setIsListening,
+    isSpeaking,
+    setIsSpeaking,
+    speakingMessageId,
+    setSpeakingMessageId
+  }), [isListening, isSpeaking, speakingMessageId]);
+
+  return (
+    <LumaStatusContext.Provider value={value}>
+      {children}
+    </LumaStatusContext.Provider>
+  );
+};
+
+export const useLumaStatus = () => {
+  const context = useContext(LumaStatusContext);
+  if (context === undefined) {
+    throw new Error('useLumaStatus must be used within a LumaStatusProvider');
+  }
+  return context;
+};

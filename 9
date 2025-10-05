@@ -1,0 +1,33 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+      },
+      colors: {
+        // Dark theme (default)
+        background: 'var(--color-background)',
+        'background-light': 'var(--color-background-light)',
+        primary: 'var(--color-primary)',
+        'primary-dark': 'var(--color-primary-dark)',
+        'text-main': 'var(--color-text-main)',
+        'text-secondary': 'var(--color-text-secondary)',
+        border: 'var(--color-border)',
+      },
+      boxShadow: {
+        'glow-primary': '0 0 15px 0 rgba(var(--color-primary-rgb), 0.3)',
+        'glow-primary-light': '0 0 8px 0 rgba(var(--color-primary-rgb), 0.2)',
+      },
+      backdropBlur: {
+        'xl': '20px',
+      },
+    },
+  },
+  plugins: [],
+}

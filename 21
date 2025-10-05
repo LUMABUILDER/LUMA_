@@ -1,0 +1,67 @@
+import { Bot, Home, Bell, StickyNote, FolderKanban, History, Settings, Power, Wand2, Eye } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { toast } from 'sonner';
+import { NavLink } from 'react-router-dom';
+
+const Sidebar = () => {
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.info("You have been signed out.");
+  }
+
+  const navItems = [
+    { icon: Home, label: 'Home', path: '/' },
+    { icon: Bell, label: 'Reminders', path: '/reminders' },
+    { icon: StickyNote, label: 'Notes', path: '/notes' },
+    { icon: FolderKanban, label: 'Media', path: '/media' },
+    { icon: Eye, label: 'LumaVision', path: '/vision' },
+    { icon: History, label: 'History', path: '/history' },
+    { icon: Wand2, label: 'AI Builder', path: '/builder' },
+  ];
+
+  const activeLinkStyle = { color: 'var(--color-primary)' };
+
+  return (
+    <aside className="w-20 bg-background-light/30 border-r border-border flex flex-col items-center justify-between py-6" style={{'--color-primary': '#00d0ff'}}>
+      <div>
+        <NavLink to="/" className="block mb-12">
+          <Bot className="w-8 h-8 text-primary hover:animate-pulse" />
+        </NavLink>
+        <nav className="flex flex-col items-center space-y-8">
+          {navItems.map((item) => (
+            <NavLink 
+              key={item.label} 
+              to={item.path} 
+              className="text-text-secondary hover:text-primary transition-colors duration-200 group relative"
+              style={({ isActive }) => isActive ? activeLinkStyle : {}}
+              end={item.path === '/'}
+            >
+              <item.icon className="w-6 h-6" />
+              <span className="absolute left-full ml-4 w-auto min-w-max px-3 py-1.5 bg-background-light text-sm rounded-md scale-0 group-hover:scale-100 transition-transform origin-left z-10">
+                {item.label}
+              </span>
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+      <div className="flex flex-col items-center space-y-8">
+         <NavLink to="/settings" className="text-text-secondary hover:text-primary transition-colors duration-200 group relative" style={({ isActive }) => isActive ? activeLinkStyle : {}}>
+            <Settings className="w-6 h-6" />
+            <span className="absolute left-full ml-4 w-auto min-w-max px-3 py-1.5 bg-background-light text-sm rounded-md scale-0 group-hover:scale-100 transition-transform origin-left z-10">
+                Settings
+            </span>
+        </NavLink>
+        <button onClick={handleSignOut} className="text-text-secondary hover:text-red-500 transition-colors duration-200 group relative">
+          <Power className="w-6 h-6" />
+          <span className="absolute left-full ml-4 w-auto min-w-max px-3 py-1.5 bg-background-light text-sm rounded-md scale-0 group-hover:scale-100 transition-transform origin-left z-10">
+            Sign Out
+          </span>
+        </button>
+      </div>
+    </aside>
+  );
+};
+
+export default Sidebar;

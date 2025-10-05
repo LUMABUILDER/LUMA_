@@ -1,0 +1,92 @@
+import { motion, AnimatePresence } from 'framer-motion';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import Sidebar from '../components/layout/Sidebar';
+import Header from '../components/layout/Header';
+import RightPanel from '../components/layout/RightPanel';
+import LumaOrb from '../components/LumaOrb';
+import ChatPage from './ChatPage';
+import NotesPage from './NotesPage';
+import RemindersPage from './RemindersPage';
+import MediaPage from './MediaPage';
+import HistoryPage from './HistoryPage';
+import SettingsPage from './SettingsPage';
+import AIPageBuilder from './AIPageBuilder';
+import LumaVisionPage from './LumaVisionPage';
+import { useProfile } from '../contexts/ProfileContext';
+import Modal from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
+import { Languages } from 'lucide-react';
+import { useState } from 'react';
+
+const LanguageSelectionModal = ({ onSelect }: { onSelect: (lang: 'English' | 'Hindi' | 'French') => void }) => {
+    const [loading, setLoading] = useState(false);
+    
+    const handleSelect = async (lang: 'English' | 'Hindi' | 'French') => {
+        setLoading(true);
+        await onSelect(lang);
+        setLoading(false);
+    };
+
+    return (
+        <div className="text-center">
+            <Languages size={48} className="mx-auto text-primary mb-4" />
+            <h4 className="text-lg font-semibold text-text-main mb-2">Choose Your Language</h4>
+            <p className="text-sm text-text-secondary mb-6">Select your preferred language for Luma.</p>
+            <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+                <Button onClick={() => handleSelect('English')} loading={loading} className="w-full sm:w-auto">English</Button>
+                <Button onClick={() => handleSelect('Hindi')} loading={loading} className="w-full sm:w-auto">हिन्दी (Hindi)</Button>
+                <Button onClick={() => handleSelect('French')} loading={loading} className="w-full sm:w-auto">Français (French)</Button>
+            </div>
+        </div>
+    );
+};
+
+
+const Dashboard = () => {
+  const location = useLocation();
+  const { profile, loading: profileLoading, updateProfile } = useProfile();
+
+  const isLanguageSet = !!profile?.language;
+
+  const handleLanguageSelect = async (lang: 'English' | 'Hindi' | 'French') => {
+    await updateProfile({ language: lang });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+      className="h-screen w-screen flex bg-background overflow-hidden"
+    >
+      <Sidebar />
+      <main className="flex-1 flex flex-col">
+        <Header />
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <AnimatePresence mode="wait">
+              <Routes location={location} key={location.pathname}>
+                <Route index element={<ChatPage />} />
+                <Route path="notes" element={<NotesPage />} />
+                <Route path="reminders" element={<RemindersPage />} />
+                <Route path="media" element={<MediaPage />} />
+                <Route path="vision" element={<LumaVisionPage />} />
+                <Route path="history" element={<HistoryPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="builder" element={<AIPageBuilder />} />
+              </Routes>
+            </AnimatePresence>
+          </div>
+          <RightPanel />
+        </div>
+      </main>
+      <LumaOrb />
+      <Modal isOpen={!profileLoading && !isLanguageSet} onClose={() => {}} title="Welcome to Luma!">
+        <LanguageSelectionModal onSelect={handleLanguageSelect} />
+      </Modal>
+    </motion.div>
+  );
+};
+
+export default Dashboard;

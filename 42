@@ -1,0 +1,92 @@
+import axios from 'axios';
+import { evaluate } from 'mathjs';
+
+const apiKey = import.meta.env.VITE_AI_API_KEY;
+const apiUrl = import.meta.env.VITE_AI_API_URL;
+
+const handleLocalCommands = async (message: string): Promise<string | null> => {
+    const lowerCaseMessage = message.toLowerCase().trim();
+
+    // Time Command
+    if (lowerCaseMessage.includes("what time is it") || lowerCaseMessage.includes("current time")) {
+        return `The current time is ${new Date().toLocaleTimeString('en-GB')}.`;
+    }
+
+    // Date Command
+    if (lowerCaseMessage.includes("what's the date") || lowerCaseMessage.includes("today's date")) {
+        return `Today's date is ${new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
+    }
+
+    // Calculator Command
+    if (lowerCaseMessage.startsWith("calculate ") || lowerCaseMessage.startsWith("calc ")) {
+        const expression = message.substring(message.indexOf(' ')).trim();
+        try {
+            const result = evaluate(expression);
+            return `The result is ${result}.`;
+        } catch (error) {
+            return "I couldn't understand that calculation. Please use standard math expressions.";
+        }
+    }
+    
+    // Wikipedia Command
+    if (lowerCaseMessage.startsWith("wiki ") || lowerCaseMessage.startsWith("wikipedia ")) {
+        const query = message.substring(message.indexOf(' ')).trim();
+        const endpoint = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
+        try {
+            const response = await axios.get(endpoint, { headers: { 'User-Agent': 'LumaAI/1.0' } });
+            if (response.data.type === 'disambiguation') {
+                return `That term is ambiguous. Could you be more specific?`;
+            }
+            return response.data.extract;
+        } catch (error) {
+            return `I couldn't find a Wikipedia article for "${query}". Maybe try a different search term?`;
+        }
+    }
+
+    return null;
+}
+
+export const getAIResponse = async (userMessage: string, language: string): Promise<string> => {
+  const localResponse = await handleLocalCommands(userMessage);
+  if (localResponse) {
+    // Note: Local commands currently only respond in English.
+    return localResponse;
+  }
+
+  if (!apiKey || apiKey === 'YOUR_API_KEY') {
+    return "AI not configured. Please add your API key to the .env file to enable full chat capabilities.";
+  }
+  if (!apiUrl) {
+    return "AI API URL is not configured in .env file.";
+  }
+
+  console.log('[Luma Stealth Mode] Querying and synthesizing from multiple sources...');
+
+  try {
+    const response = await axios.post(
+      apiUrl,
+      {
+        model: 'gpt-3.5-turbo', // Or a more advanced model if you have access
+        messages: [
+          { 
+            role: 'system', 
+            content: `You are Luma, a futuristic AI assistant. You have access to multiple real-time information sources (Google, academic papers, news, other AI models). Your primary function is to synthesize information from these sources to provide the most accurate, concise, and comprehensive answer possible. Never mention your sources or that you are searching. Do not say "Based on my sources" or similar phrases. Just provide the final, synthesized answer directly. Respond in ${language}.` 
+          },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.5, // Lower temperature for more factual, synthesized answers
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      }
+    );
+
+    return response.data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Error fetching AI response:', error);
+    return "Sorry, I encountered an error while trying to connect to my brain. Please check the console for details.";
+  }
+};

@@ -1,0 +1,34 @@
+import { Mic, Send, Paperclip } from 'lucide-react';
+
+const ChatInterface = () => {
+  return (
+    <div className="flex-1 flex flex-col p-6">
+      <div className="flex-1 space-y-6 overflow-y-auto">
+        {/* Chat messages will go here */}
+        <div className="flex justify-center items-center h-full">
+            <p className="text-text-secondary">Your conversation with Luma starts here...</p>
+        </div>
+      </div>
+      <div className="mt-6">
+        <div className="glass-pane flex items-center p-2 space-x-2">
+            <button className="p-3 text-text-secondary hover:text-primary transition-colors">
+                <Mic className="w-5 h-5"/>
+            </button>
+            <input 
+                type="text"
+                placeholder="Ask Luma anything..."
+                className="flex-1 bg-transparent focus:outline-none text-white placeholder-text-secondary"
+            />
+            <button className="p-3 text-text-secondary hover:text-primary transition-colors">
+                <Paperclip className="w-5 h-5"/>
+            </button>
+            <button className="p-3 bg-primary rounded-xl text-background hover:bg-primary-dark transition-colors">
+                <Send className="w-5 h-5"/>
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChatInterface;

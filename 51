@@ -1,0 +1,122 @@
+import { motion } from 'framer-motion';
+import { Eye, Video, VideoOff, Camera, AlertTriangle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Button } from '../components/ui/Button';
+import { toast } from 'sonner';
+import { useChat } from '../hooks/useChat';
+import { useNavigate } from 'react-router-dom';
+
+type CameraStatus = 'idle' | 'requesting' | 'streaming' | 'denied' | 'error';
+
+const LumaVisionPage = () => {
+    const [status, setStatus] = useState<CameraStatus>('idle');
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const { sendMessage } = useChat();
+    const navigate = useNavigate();
+
+    const startCamera = async () => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            setStatus('requesting');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                streamRef.current = stream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+                setStatus('streaming');
+            } catch (err: any) {
+                console.error("Error accessing camera:", err);
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    setStatus('denied');
+                    toast.error("Camera access denied. Please enable it in your browser settings.");
+                } else {
+                    setStatus('error');
+                    toast.error("Could not access camera. Is it being used by another app?");
+                }
+            }
+        } else {
+            setStatus('error');
+            toast.error("Your browser does not support camera access.");
+        }
+    };
+
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
+        setStatus('idle');
+    };
+
+    const handleAnalyze = () => {
+        // In a real app, you'd capture a frame and send it to an AI model.
+        // For this simulation, we'll just send a text prompt.
+        toast.info("Sending view to Luma for analysis...");
+        sendMessage("Describe what you see in this scene.");
+        navigate('/'); // Navigate back to chat to see the response
+    };
+
+    useEffect(() => {
+        return () => {
+            stopCamera(); // Cleanup on component unmount
+        };
+    }, []);
+
+    const renderContent = () => {
+        switch (status) {
+            case 'streaming':
+                return (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain rounded-lg" />
+                        <div className="absolute bottom-6 flex space-x-4">
+                            <Button onClick={handleAnalyze}><Camera className="mr-2 h-4 w-4" /> Analyze View</Button>
+                            <Button variant="destructive" onClick={stopCamera}><VideoOff className="mr-2 h-4 w-4" /> Stop Camera</Button>
+                        </div>
+                    </div>
+                );
+            case 'denied':
+            case 'error':
+                 return (
+                    <div className="text-center">
+                        <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold mb-2">Camera Access Problem</h3>
+                        <p className="text-text-secondary mb-4">
+                            {status === 'denied' ? "Luma needs permission to access your camera." : "An error occurred while accessing the camera."}
+                        </p>
+                        <Button onClick={startCamera}>Try Again</Button>
+                    </div>
+                );
+            case 'idle':
+            case 'requesting':
+            default:
+                return (
+                    <div className="text-center">
+                        <Video className="w-24 h-24 text-primary/30 mx-auto mb-6" />
+                        <h3 className="text-xl font-semibold mb-2">Activate LumaVision</h3>
+                        <p className="text-text-secondary mb-4">Allow Luma to access your camera to analyze your surroundings in real-time.</p>
+                        <Button onClick={startCamera} loading={status === 'requesting'}>
+                            <Eye className="mr-2 h-4 w-4" /> Start Camera
+                        </Button>
+                    </div>
+                );
+        }
+    }
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-8 w-full h-full flex flex-col items-center justify-center"
+        >
+            <div className="w-full h-full glass-pane flex items-center justify-center relative">
+                {renderContent()}
+            </div>
+        </motion.div>
+    );
+};
+
+export default LumaVisionPage;

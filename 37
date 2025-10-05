@@ -1,0 +1,78 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { Note } from '../types';
+import { toast } from 'sonner';
+
+export const useNotes = () => {
+  const { user } = useAuth();
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotes = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setNotes(data || []);
+    } catch (error: any) {
+      toast.error('Failed to load notes.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  const addNote = async (title: string, content: string) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({ user_id: user.id, title, content })
+        .select()
+        .single();
+      if (error) throw error;
+      setNotes(prev => [data, ...prev]);
+      toast.success('Note added!');
+    } catch (error: any) {
+      toast.error('Failed to add note.');
+    }
+  };
+
+  const updateNote = async (id: string, title: string, content: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .update({ title, content, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      setNotes(prev => prev.map(n => (n.id === id ? data : n)));
+      toast.success('Note updated!');
+    } catch (error: any) {
+      toast.error('Failed to update note.');
+    }
+  };
+
+  const deleteNote = async (id: string) => {
+    try {
+      const { error } = await supabase.from('notes').delete().eq('id', id);
+      if (error) throw error;
+      setNotes(prev => prev.filter(n => n.id !== id));
+      toast.success('Note deleted.');
+    } catch (error: any) {
+      toast.error('Failed to delete note.');
+    }
+  };
+
+  return { notes, loading, addNote, updateNote, deleteNote };
+};

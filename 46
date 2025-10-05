@@ -1,0 +1,83 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useLumaStatus } from '../contexts/LumaStatusContext';
+import { toast } from 'sonner';
+
+// Polyfill for browsers that might not have it
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+export const useSpeechRecognition = (onResult: (transcript: string) => void) => {
+  const { setIsListening } = useLumaStatus();
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [isSupported, setIsSupported] = useState(true);
+
+  useEffect(() => {
+    if (!SpeechRecognition) {
+      setIsSupported(false);
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+
+    rec.onstart = () => {
+      setIsListening(true);
+    };
+
+    rec.onend = () => {
+      setIsListening(false);
+    };
+
+    rec.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        toast.error("Microphone access denied. Please allow it in your browser settings.");
+      }
+      setIsListening(false);
+    };
+
+    rec.onresult = (event) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        onResult(finalTranscript.trim());
+      }
+    };
+
+    setRecognition(rec);
+
+    return () => {
+      if (rec) {
+        rec.stop();
+      }
+    };
+  }, [setIsListening, onResult]);
+
+  const startListening = useCallback((lang: string) => {
+    if (!isSupported) {
+        toast.error("Voice recognition is not supported in your browser.");
+        return;
+    }
+    if (recognition) {
+      try {
+        recognition.lang = lang;
+        recognition.start();
+      } catch (e) {
+        // This can happen if recognition is already running, which is fine.
+        console.log("Could not start recognition (might already be running):", e);
+      }
+    }
+  }, [recognition, isSupported]);
+
+  const stopListening = useCallback(() => {
+    if (recognition) {
+      recognition.stop();
+    }
+  }, [recognition]);
+
+  return { startListening, stopListening, isSupported };
+};

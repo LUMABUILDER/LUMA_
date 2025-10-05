@@ -1,0 +1,86 @@
+/*
+# [Create Core Feature Tables: Messages, Notes, Reminders]
+This migration sets up the foundational tables for Luma's core functionality. It creates tables for storing chat messages, user notes, and reminders. It also enables Row-Level Security (RLS) and defines policies to ensure users can only access their own data, providing a secure and private experience from the start.
+
+## Query Description:
+This script is structural and safe to run on a new project. It does not modify or delete any existing data. It creates three new tables: `messages`, `notes`, and `reminders`, and configures their security policies.
+
+## Metadata:
+- Schema-Category: "Structural"
+- Impact-Level: "Low"
+- Requires-Backup: false
+- Reversible: true (requires manually dropping tables and types)
+
+## Structure Details:
+- **Tables Created:**
+  - `public.messages`: Stores chat history between the user and Luma.
+  - `public.notes`: Stores user-created notes.
+  - `public.reminders`: Stores user-created reminders.
+- **Types Created:**
+  - `public.message_role`: An ENUM type for the `messages` table ('user', 'assistant').
+  - `public.reminder_status`: An ENUM type for the `reminders` table ('pending', 'done', 'cancelled').
+
+## Security Implications:
+- **RLS Status:** Enabled on all three new tables.
+- **Policy Changes:** Yes. Policies are created to restrict data access to the record owner (`auth.uid()`).
+- **Auth Requirements:** Users must be authenticated to interact with these tables.
+
+## Performance Impact:
+- **Indexes:** Primary key indexes are automatically created. Foreign key indexes on `user_id` are also created, ensuring efficient lookups.
+- **Triggers:** None added in this migration.
+- **Estimated Impact:** Low. This is a standard schema setup for a user-centric application.
+*/
+
+-- Create ENUM types for status/role columns
+CREATE TYPE public.message_role AS ENUM ('user', 'assistant');
+CREATE TYPE public.reminder_status AS ENUM ('pending', 'done', 'cancelled');
+
+-- 1. Messages Table
+-- Stores the chat history for each user.
+CREATE TABLE public.messages (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    user_id uuid NOT NULL DEFAULT auth.uid(),
+    content text NOT NULL,
+    role public.message_role NOT NULL,
+    CONSTRAINT messages_pkey PRIMARY KEY (id),
+    CONSTRAINT messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE
+);
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own messages" ON public.messages FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- 2. Notes Table
+-- Stores notes created by users.
+CREATE TABLE public.notes (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    user_id uuid NOT NULL DEFAULT auth.uid(),
+    title text,
+    content text,
+    CONSTRAINT notes_pkey PRIMARY KEY (id),
+    CONSTRAINT notes_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE
+);
+ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own notes" ON public.notes FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- 3. Reminders Table
+-- Stores reminders set by users.
+CREATE TABLE public.reminders (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    user_id uuid NOT NULL DEFAULT auth.uid(),
+    text text NOT NULL,
+    scheduled_at timestamp with time zone NOT NULL,
+    status public.reminder_status NOT NULL DEFAULT 'pending'::public.reminder_status,
+    CONSTRAINT reminders_pkey PRIMARY KEY (id),
+    CONSTRAINT reminders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE
+);
+ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own reminders" ON public.reminders FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);

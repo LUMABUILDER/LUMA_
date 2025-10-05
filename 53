@@ -1,0 +1,94 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
+import { UserProfile } from '../types';
+import { toast } from 'sonner';
+
+interface ProfileContextType {
+  profile: UserProfile | null;
+  loading: boolean;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+}
+
+const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
+
+export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = useCallback(async () => {
+    if (!user) {
+        setLoading(false);
+        setProfile(null);
+        return;
+    };
+
+    setLoading(true);
+    try {
+      const { data, error, status } = await supabase
+        .from('profiles')
+        .select(`id, display_name, language`)
+        .eq('id', user.id)
+        .single();
+
+      if (error && status !== 406) {
+        throw error;
+      }
+
+      if (data) {
+        setProfile(data);
+      } else {
+        // Create profile if it doesn't exist
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({ id: user.id, display_name: user.email?.split('@')[0] })
+          .select()
+          .single();
+        if (insertError) throw insertError;
+        setProfile(newProfile);
+      }
+    } catch (error: any) {
+      toast.error("Could not fetch user profile.");
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      setProfile(data);
+      toast.success("Profile updated!");
+    } catch (error: any) {
+      toast.error("Failed to update profile.");
+    }
+  };
+
+  return (
+    <ProfileContext.Provider value={{ profile, loading, updateProfile }}>
+      {children}
+    </ProfileContext.Provider>
+  );
+};
+
+export const useProfile = () => {
+  const context = useContext(ProfileContext);
+  if (context === undefined) {
+    throw new Error('useProfile must be used within a ProfileProvider');
+  }
+  return context;
+};

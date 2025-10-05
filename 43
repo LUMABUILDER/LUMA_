@@ -1,0 +1,87 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { MediaFile } from '../types';
+import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
+
+export const useMedia = () => {
+  const { user } = useAuth();
+  const [media, setMedia] = useState<MediaFile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const BUCKET_NAME = 'user_media';
+
+  const getPublicUrl = (filePath: string) => {
+    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const fetchMedia = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.storage.from(BUCKET_NAME).list(user.id, {
+        limit: 100,
+        offset: 0,
+        sortBy: { column: 'created_at', order: 'desc' },
+      });
+
+      if (error) throw error;
+      
+      const mediaFiles: MediaFile[] = (data || []).map(file => ({
+        id: file.id ?? file.name,
+        name: file.name,
+        url: getPublicUrl(`${user.id}/${file.name}`),
+        file_path: `${user.id}/${file.name}`,
+        mime_type: file.metadata.mimetype,
+        created_at: file.created_at,
+      }));
+
+      setMedia(mediaFiles);
+    } catch (error: any) {
+      toast.error('Failed to load media files.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchMedia();
+  }, [fetchMedia]);
+
+  const uploadMedia = async (file: File) => {
+    if (!user) return;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, file);
+
+      if (error) throw error;
+      
+      // Refresh list
+      await fetchMedia();
+      
+    } catch (error: any) {
+      toast.error(`Failed to upload ${file.name}.`);
+      throw error; // Re-throw to be caught in component
+    }
+  };
+
+  const deleteMedia = async (filePath: string) => {
+    try {
+      const { error } = await supabase.storage.from(BUCKET_NAME).remove([filePath]);
+      if (error) throw error;
+      setMedia(prev => prev.filter(f => f.file_path !== filePath));
+      toast.success('File deleted.');
+    } catch (error: any) {
+      toast.error('Failed to delete file.');
+    }
+  };
+
+  return { media, loading, uploadMedia, deleteMedia, fetchMedia };
+};

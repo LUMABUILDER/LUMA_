@@ -1,0 +1,34 @@
+/*
+          # Add Language Preference
+          This migration adds a 'language' column to the 'profiles' table to store the user's preferred language.
+
+          ## Query Description: 
+          This operation alters the 'profiles' table to add a new text column. It is a non-destructive change and will not affect existing data. New profiles will have a NULL value for language until it is set by the user.
+          
+          ## Metadata:
+          - Schema-Category: "Structural"
+          - Impact-Level: "Low"
+          - Requires-Backup: false
+          - Reversible: true
+          
+          ## Structure Details:
+          - Table: public.profiles
+          - Action: ADD COLUMN
+          - Column: language (text)
+          
+          ## Security Implications:
+          - RLS Status: Unchanged
+          - Policy Changes: No
+          - Auth Requirements: None
+          
+          ## Performance Impact:
+          - Indexes: None
+          - Triggers: None
+          - Estimated Impact: Negligible performance impact.
+          */
+
+ALTER TABLE public.profiles
+ADD COLUMN language TEXT;
+
+-- Add a comment to the new column
+COMMENT ON COLUMN public.profiles.language IS 'Stores the user''s preferred language code (e.g., en-GB, hi-IN, fr-FR)';

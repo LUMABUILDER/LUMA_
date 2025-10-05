@@ -1,0 +1,56 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useLumaStatus } from '../contexts/LumaStatusContext';
+import { toast } from 'sonner';
+
+export const useTTS = () => {
+  const { setIsSpeaking, setSpeakingMessageId } = useLumaStatus();
+  const [isSupported, setIsSupported] = useState(true);
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) {
+      setIsSupported(false);
+    }
+  }, []);
+
+  const speak = useCallback((text: string, messageId: string, lang: string) => {
+    if (!isSupported) {
+      toast.error("Text-to-speech is not supported in your browser.");
+      return;
+    }
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setSpeakingMessageId(messageId);
+    };
+    
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    };
+
+    utterance.onerror = (event) => {
+      console.error('Speech synthesis error', event.error);
+      toast.error("An error occurred during speech synthesis.");
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }, [isSupported, setIsSpeaking, setSpeakingMessageId]);
+
+  const cancel = useCallback(() => {
+    if (isSupported) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    }
+  }, [isSupported, setIsSpeaking, setSpeakingMessageId]);
+
+  return { speak, cancel, isSupported };
+};

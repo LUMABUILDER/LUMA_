@@ -1,0 +1,11 @@
+export const getLanguageCode = (language: 'English' | 'Hindi' | 'French' | null | undefined): string => {
+    switch (language) {
+        case 'Hindi':
+            return 'hi-IN';
+        case 'French':
+            return 'fr-FR';
+        case 'English':
+        default:
+            return 'en-GB';
+    }
+};

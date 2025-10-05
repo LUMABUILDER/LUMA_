@@ -1,0 +1,113 @@
+/*
+          # [Feature Expansion: Profiles, Alarms, Health & Secure Deletion]
+          This migration introduces several new tables to support major new features and adds a critical security function for user account deletion.
+
+          ## Query Description: [This operation adds new tables for user profiles, alarms, and health logs. It also creates a secure database function to handle the complete deletion of a user's account and all their associated data across the application. This is a structural change and is safe to apply.]
+          
+          ## Metadata:
+          - Schema-Category: ["Structural", "Data"]
+          - Impact-Level: ["Medium"]
+          - Requires-Backup: [false]
+          - Reversible: [true]
+          
+          ## Structure Details:
+          - **New Tables:** `profiles`, `alarms`, `health_logs`
+          - **New Function:** `public.delete_user_account()`
+          - **RLS Policies:** New policies will be created for the new tables to ensure users can only access their own data.
+          
+          ## Security Implications:
+          - RLS Status: [Enabled]
+          - Policy Changes: [Yes]
+          - Auth Requirements: [User must be authenticated]
+          
+          ## Performance Impact:
+          - Indexes: [Primary keys and foreign keys are indexed by default.]
+          - Triggers: [A trigger is added to create a user profile upon signup.]
+          - Estimated Impact: [Low performance impact.]
+          */
+
+-- 1. PROFILES TABLE
+-- Stores public user data like display names.
+CREATE TABLE public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    display_name TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS for profiles
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own profile." ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update their own profile." ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Trigger to create a profile for new users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, display_name)
+    VALUES (new.id, new.email);
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+
+-- 2. ALARMS TABLE
+-- Stores user-defined alarms.
+CREATE TABLE public.alarms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    label TEXT,
+    alarm_at TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS for alarms
+ALTER TABLE public.alarms ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own alarms." ON public.alarms FOR ALL USING (auth.uid() = user_id);
+
+
+-- 3. HEALTH LOGS TABLE
+-- Stores user's health/meal logs.
+CREATE TABLE public.health_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    meal_description TEXT NOT NULL,
+    log_time TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS for health_logs
+ALTER TABLE public.health_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own health logs." ON public.health_logs FOR ALL USING (auth.uid() = user_id);
+
+
+-- 4. SECURE ACCOUNT DELETION FUNCTION
+-- This function securely deletes a user and all their associated data.
+CREATE OR REPLACE FUNCTION public.delete_user_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Delete from all related tables
+  DELETE FROM public.notes WHERE user_id = auth.uid();
+  DELETE FROM public.reminders WHERE user_id = auth.uid();
+  DELETE FROM public.chat_history WHERE user_id = auth.uid();
+  DELETE FROM public.alarms WHERE user_id = auth.uid();
+  DELETE FROM public.health_logs WHERE user_id = auth.uid();
+  
+  -- Note: Deleting from storage is handled on the client-side before calling this
+  -- because of storage's different permission model.
+  -- Alternatively, a more advanced setup would use a service_role key in a trusted edge function.
+
+  -- Delete from profiles table
+  DELETE FROM public.profiles WHERE id = auth.uid();
+  
+  -- Finally, delete the user from the auth schema
+  DELETE FROM auth.users WHERE id = auth.uid();
+END;
+$$;

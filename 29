@@ -1,0 +1,69 @@
+import { motion } from 'framer-motion';
+import { Bot, User, Volume2, Loader2 } from 'lucide-react';
+import { ChatMessage as ChatMessageType } from '../../types';
+import { useTTS } from '../../hooks/useTTS';
+import { useLumaStatus } from '../../contexts/LumaStatusContext';
+import { useProfile } from '../../contexts/ProfileContext';
+import { getLanguageCode } from '../../lib/utils';
+
+interface ChatMessageProps {
+  message: ChatMessageType;
+}
+
+const ChatMessage = ({ message }: ChatMessageProps) => {
+  const isUser = message.role === 'user';
+  const { speak, cancel, isSupported } = useTTS();
+  const { isSpeaking, speakingMessageId } = useLumaStatus();
+  const { profile } = useProfile();
+
+  const isCurrentlySpeaking = isSpeaking && speakingMessageId === message.id;
+
+  const handleSpeak = () => {
+    if (isCurrentlySpeaking) {
+      cancel();
+    } else {
+      const langCode = getLanguageCode(profile?.language);
+      speak(message.content, message.id, langCode);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`flex items-start gap-4 ${isUser ? 'justify-end' : ''}`}
+    >
+      {!isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+          <Bot className="w-5 h-5 text-primary" />
+        </div>
+      )}
+      <div
+        className={`relative group max-w-xl px-4 py-3 rounded-2xl ${
+          isUser
+            ? 'bg-primary text-background rounded-br-none'
+            : 'glass-pane rounded-bl-none'
+        } ${isCurrentlySpeaking ? 'shadow-glow-primary-light' : ''}`}
+      >
+        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        {!isUser && isSupported && (
+          <button 
+            onClick={handleSpeak}
+            className="absolute -bottom-3 -right-3 p-1.5 bg-background-light border border-border rounded-full text-text-secondary hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+            title={isCurrentlySpeaking ? 'Stop speaking' : 'Read aloud'}
+          >
+            {isCurrentlySpeaking ? <Loader2 size={14} className="animate-spin" /> : <Volume2 size={14} />}
+          </button>
+        )}
+      </div>
+       {isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-background-light flex items-center justify-center">
+          <User className="w-5 h-5 text-text-secondary" />
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+export default ChatMessage;

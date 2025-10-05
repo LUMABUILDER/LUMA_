@@ -1,0 +1,77 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { Reminder } from '../types';
+import { toast } from 'sonner';
+
+export const useReminders = () => {
+  const { user } = useAuth();
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchReminders = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('remind_at', { ascending: true });
+      if (error) throw error;
+      setReminders(data || []);
+    } catch (error: any) {
+      toast.error('Failed to load reminders.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchReminders();
+  }, [fetchReminders]);
+
+  const addReminder = async (content: string, remind_at: string) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('reminders')
+        .insert({ user_id: user.id, content, remind_at })
+        .select()
+        .single();
+      if (error) throw error;
+      setReminders(prev => [...prev, data].sort((a,b) => new Date(a.remind_at).getTime() - new Date(b.remind_at).getTime()));
+      toast.success('Reminder set!');
+    } catch (error: any) {
+      toast.error('Failed to set reminder.');
+    }
+  };
+
+  const toggleReminder = async (id: string, is_completed: boolean) => {
+    try {
+      const { data, error } = await supabase
+        .from('reminders')
+        .update({ is_completed: !is_completed })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      setReminders(prev => prev.map(r => (r.id === id ? data : r)));
+    } catch (error: any) {
+      toast.error('Failed to update reminder.');
+    }
+  };
+
+  const deleteReminder = async (id: string) => {
+    try {
+      const { error } = await supabase.from('reminders').delete().eq('id', id);
+      if (error) throw error;
+      setReminders(prev => prev.filter(r => r.id !== id));
+      toast.success('Reminder deleted.');
+    } catch (error: any) {
+      toast.error('Failed to delete reminder.');
+    }
+  };
+
+  return { reminders, loading, addReminder, toggleReminder, deleteReminder };
+};

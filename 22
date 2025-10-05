@@ -1,0 +1,85 @@
+import { Smile, BrainCircuit, Coffee } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { useProfile } from '../../contexts/ProfileContext';
+
+const getProactiveGreeting = (name: string) => {
+  const hour = new Date().getHours();
+  const greetings = {
+    morning: [
+      `Good morning, ${name}. Ready to tackle the day?`,
+      `Morning, ${name}! Let's review your priorities. You have upcoming reminders.`,
+      `Hello, ${name}. A fresh start! What's our first objective?`
+    ],
+    afternoon: [
+      `Good afternoon, ${name}. Hitting the afternoon slump? I can find some focus music.`,
+      `Afternoon, ${name}. Hope you're having a productive day.`,
+      `Hello, ${name}. Let's keep the momentum going.`
+    ],
+    evening: [
+      `Good evening, ${name}. Time to wind down. Shall we review today's notes?`,
+      `Evening, ${name}. I've logged your activities in the history panel.`,
+      `Hello, ${name}. Ready to plan for tomorrow?`
+    ]
+  };
+
+  let period: 'morning' | 'afternoon' | 'evening';
+  if (hour < 12) period = 'morning';
+  else if (hour < 18) period = 'afternoon';
+  else period = 'evening';
+
+  return greetings[period][Math.floor(Math.random() * greetings[period].length)];
+};
+
+const useSimulatedMood = () => {
+    const moods = [
+        { name: 'Focused', icon: BrainCircuit, color: 'text-cyan-400' },
+        { name: 'Calm', icon: Coffee, color: 'text-green-400' },
+        { name: 'Creative', icon: Smile, color: 'text-purple-400' }
+    ];
+    const [currentMoodIndex, setCurrentMoodIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentMoodIndex(prev => (prev + 1) % moods.length);
+        }, 15000); // Change mood every 15 seconds
+        return () => clearInterval(interval);
+    }, []);
+
+    return moods[currentMoodIndex];
+};
+
+
+const Header = () => {
+  const { profile } = useProfile();
+  const displayName = profile?.display_name || 'User';
+  const greeting = useMemo(() => getProactiveGreeting(displayName), [displayName]);
+  const mood = useSimulatedMood();
+  const MoodIcon = mood.icon;
+
+  return (
+    <header className="h-20 flex items-center justify-between px-8 border-b border-border">
+      <div>
+        <h1 className="text-xl font-semibold text-white">{greeting.split('.')[0]}.</h1>
+        <p className="text-sm text-text-secondary">{greeting.split('.')[1]}</p>
+      </div>
+      <div className="flex items-center space-x-4">
+        <div className="group relative flex items-center space-x-2 glass-pane px-3 py-1.5">
+            <MoodIcon className={`w-5 h-5 transition-colors ${mood.color}`} />
+            <span className="text-sm text-text-secondary">{mood.name}</span>
+            <span className="absolute bottom-full mb-2 w-auto min-w-max px-3 py-1.5 bg-background-light text-xs rounded-md scale-0 group-hover:scale-100 transition-transform origin-bottom z-10">
+                HumanSense Engine: Simulating mood detection.
+            </span>
+        </div>
+        <div className="w-10 h-10 rounded-full bg-background-light border border-border overflow-hidden">
+            <img 
+                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=2080&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                alt="User profile" 
+                className="w-full h-full object-cover"
+            />
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;

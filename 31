@@ -1,0 +1,134 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Plus, StickyNote, Loader2, Edit, Trash2 } from 'lucide-react';
+import { useNotes } from '../hooks/useNotes';
+import { Note } from '../types';
+import Modal from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Textarea } from '../components/ui/Textarea';
+
+const NoteForm = ({ note, onSubmit, onCancel, loading }: { note?: Note | null, onSubmit: (title: string, content: string) => void, onCancel: () => void, loading: boolean }) => {
+  const [title, setTitle] = useState(note?.title || '');
+  const [content, setContent] = useState(note?.content || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(title, content);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input
+        placeholder="Note Title (optional)"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <Textarea
+        placeholder="Type your note here..."
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        rows={6}
+        required
+      />
+      <div className="flex justify-end space-x-2">
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" loading={loading}>{note ? 'Save Changes' : 'Add Note'}</Button>
+      </div>
+    </form>
+  );
+};
+
+const NoteItem = ({ note, onEdit, onDelete }: { note: Note, onEdit: (note: Note) => void, onDelete: (id: string) => void }) => (
+    <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className="glass-pane p-4 flex flex-col"
+    >
+        <div className="flex-1 mb-4">
+            {note.title && <h4 className="font-semibold text-white mb-2">{note.title}</h4>}
+            <p className="text-sm text-text-secondary whitespace-pre-wrap">{note.content}</p>
+        </div>
+        <div className="flex items-center justify-between text-xs text-text-secondary/70">
+            <span>{new Date(note.created_at).toLocaleDateString()}</span>
+            <div className="flex items-center space-x-2">
+                <button onClick={() => onEdit(note)} className="hover:text-primary"><Edit size={16}/></button>
+                <button onClick={() => onDelete(note.id)} className="hover:text-red-500"><Trash2 size={16}/></button>
+            </div>
+        </div>
+    </motion.div>
+);
+
+const NotesPage = () => {
+  const { notes, loading, addNote, updateNote, deleteNote } = useNotes();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+
+  const handleOpenModal = (note?: Note) => {
+    setEditingNote(note || null);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingNote(null);
+  };
+
+  const handleSubmit = async (title: string, content: string) => {
+    setFormLoading(true);
+    if (editingNote) {
+      await updateNote(editingNote.id, title, content);
+    } else {
+      await addNote(title, content);
+    }
+    setFormLoading(false);
+    handleCloseModal();
+  };
+  
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this note?")) {
+        await deleteNote(id);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="p-8 w-full h-full flex flex-col"
+    >
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-bold text-white">Notes</h2>
+        <Button onClick={() => handleOpenModal()}>
+          <Plus className="mr-2 h-4 w-4" /> Add Note
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      ) : notes.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <StickyNote className="w-24 h-24 text-primary/30 mb-6" />
+          <h3 className="text-xl font-semibold text-white">No notes yet</h3>
+          <p className="text-text-secondary">Click 'Add Note' to create your first one.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2">
+          {notes.map(note => (
+            <NoteItem key={note.id} note={note} onEdit={handleOpenModal} onDelete={handleDelete} />
+          ))}
+        </div>
+      )}
+
+      <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingNote ? 'Edit Note' : 'New Note'}>
+        <NoteForm note={editingNote} onSubmit={handleSubmit} onCancel={handleCloseModal} loading={formLoading} />
+      </Modal>
+    </motion.div>
+  );
+};
+
+export default NotesPage;
